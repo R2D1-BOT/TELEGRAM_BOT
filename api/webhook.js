@@ -1,53 +1,55 @@
-import fetch from 'node-fetch';
+const axios = require("axios");
 
-const chatSessions = {}; // TelegramID → chat_id de Retell
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const RETELL_API_KEY = process.env.RETELL_API_KEY;
+const RETELL_AGENT_ID = process.env.RETELL_AGENT_ID;
 
-export default async function handler(req, res) {
-  const msg = req.body.message;
-  if (!msg || !msg.text || msg.from.is_bot) return res.sendStatus(200);
+const TELEGRAM_API_URL = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+const RETELL_BASE_URL = "https://api.retellai.com/v3";
 
-  const telegramId = msg.chat.id;
-  const userText = msg.text;
+const sessions = {}; // user_id → chat_id
 
+module.exports = async (req, res) => {
   try {
-    if (!chatSessions[telegramId]) {
-      const chatResp = await fetch('https://api.retellai.com/create-chat', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.RETELL_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ agent_id: process.env.RETELL_AGENT_ID })
-      });
-      const chatData = await chatResp.json();
-      chatSessions[telegramId] = chatData.chat_id;
+    const msg = req.body.message;
+    if (!msg || !msg.text || !msg.chat || !msg.chat.id) {
+      return res.sendStatus(200);
     }
 
-    const completionResp = await fetch('https://api.retellai.com/create-chat-completion', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.RETELL_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        chat_id: chatSessions[telegramId],
-        content: userText
-      })
-    });
+    const user_id = msg.chat.id.toString();
+    const text = msg.text;
+    let chat_id = sessions[user_id];
 
-    const completionData = await completionResp.json();
-    const agentMsg = completionData.messages?.[0]?.content || 'Sin respuesta del agente.';
+    if (!chat_id) {
+      const createChat = await axios.post(
+        `${RETELL_BASE_URL}/create-chat`,
+        { agent_id: RETELL_AGENT_ID },
+        { headers: { Authorization: `Bearer ${RETELL_API_KEY}` } }
+      );
 
-    await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: telegramId, text: agentMsg })
-    });
+      chat_id = createChat.data.chat_id;
+      sessions[user_id] = chat_id;
+    }
+
+    const completion = await axios.post(
+      `${RETELL_BASE_URL}/create-chat-completion`,
+      { chat_id, content: text },
+      { headers: { Authorization: `Bearer ${RETELL_API_KEY}` } }
+    );
+
+    const responseMessages = completion.data.messages;
+    if (responseMessages && responseMessages.length > 0) {
+      const reply = responseMessages.map(m => m.content).join("\n\n");
+      await axios.post(TELEGRAM_API_URL, {
+        chat_id: user_id,
+        text: reply
+      });
+    }
 
     res.sendStatus(200);
-
   } catch (err) {
-    console.error('Error en webhook:', err);
+    console.error("Error en webhook:", err?.response?.data || err.message);
     res.sendStatus(500);
   }
-}
+};
+
