@@ -59,5 +59,32 @@ router.post('/webhook', async (req, res) => {
       console.log(`Respuesta de Retell: ${reply}`);
 
       await axios.post(TELEGRAM_API_URL, {
+        chat_id: user_id,
+        text: reply
+      });
+      console.log("Respuesta enviada a Telegram.");
+
+    } catch (retellError) {
+      console.error('ERROR del SDK de Retell AI:', retellError?.response?.data || retellError.message);
+      const errorText = retellError.message || 'Error desconocido del SDK de Retell AI.';
+      try {
+        await axios.post(TELEGRAM_API_URL, {
+          chat_id: user_id,
+          text: `Lo siento, el motor de IA de Retell tuvo un error: ${errorText.substring(0, 150)}...`,
+        });
+      } catch (e) {
+        console.error("Error al enviar mensaje de error a Telegram:", e);
+      }
+      return res.status(500).json({ error: `Retell AI SDK error: ${errorText}` });
+    }
+
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('Error general en webhook:', err?.response?.data || err.message);
+    res.sendStatus(500);
+  }
+});
+
+module.exports = router;
 
 
