@@ -1,7 +1,7 @@
 const express = require('express');
 const axios = require('axios'); // Todavía necesario para Telegram
 const router = express.Router();
-const Retell = require('retell-sdk'); // Importar el SDK de Retell AI
+const Retell = require('retell-sdk').default;; // Importar el SDK de Retell AI
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const RETELL_API_KEY = process.env.RETELL_API_KEY;
