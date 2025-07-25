@@ -39,3 +39,8 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`📱 Webhook endpoint: /api/webhook`);
   console.log(`🌐 Health check: /health`);
 });
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📱 Webhook endpoint: /api/webhook`);
+  console.log(`🌐 Health check: /health`);
+});
