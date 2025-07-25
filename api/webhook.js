@@ -15,8 +15,9 @@ console.log('TELEGRAM_BOT_TOKEN:', TELEGRAM_BOT_TOKEN ? 'DEFINIDA' : 'VACÍA');
 
 const retellClient = new Retell({ apiKey: RETELL_API_KEY });
 
-// Almacenar chat_ids por usuario
+// Almacenar chat_ids por usuario y timeouts
 const userChats = {};
+const userTimeouts = {};
 
 router.post('/webhook', async (req, res) => {
   console.log('Webhook payload:', JSON.stringify(req.body));
@@ -31,6 +32,12 @@ router.post('/webhook', async (req, res) => {
 
   try {
     let chat_id;
+
+    // Cancelar timeout anterior si existe
+    if (userTimeouts[user_id]) {
+      clearTimeout(userTimeouts[user_id]);
+      delete userTimeouts[user_id];
+    }
 
     // Si ya tiene un chat creado, usar ese
     if (userChats[user_id]) {
@@ -77,6 +84,37 @@ router.post('/webhook', async (req, res) => {
     });
 
     console.log(`Respuesta enviada a Telegram usuario ${user_id}: ${reply}`);
+
+    // Programar cierre del chat por inactividad (10 minutos)
+    userTimeouts[user_id] = setTimeout(async () => {
+      try {
+        console.log(`Cerrando chat por inactividad para usuario ${user_id}`);
+        
+        // Enviar mensaje de cierre
+        await axios.post(TELEGRAM_API_URL, {
+          chat_id: user_id,
+          text: "Chat cerrado por inactividad. Escribe cualquier mensaje para iniciar una nueva conversación.",
+        });
+
+        // Cerrar chat en Retell si existe el método
+        if (userChats[user_id]) {
+          try {
+            await retellClient.chat.end({ chat_id: userChats[user_id] });
+            console.log(`Chat ${userChats[user_id]} cerrado en Retell`);
+          } catch (endError) {
+            console.log('No se pudo cerrar el chat en Retell (método no disponible)');
+          }
+        }
+
+        // Limpiar datos del usuario
+        delete userChats[user_id];
+        delete userTimeouts[user_id];
+        
+      } catch (timeoutError) {
+        console.error('Error en timeout de inactividad:', timeoutError);
+      }
+    }, 10 * 60 * 1000); // 10 minutos
+
     res.sendStatus(200);
 
   } catch (error) {
@@ -141,8 +179,5 @@ router.get('/test-retell', async (req, res) => {
 });
 
 module.exports = router;
-
-module.exports = router;
-
 
 
