@@ -9,6 +9,9 @@ const RETELL_API_KEY = process.env.RETELL_API_KEY;
 const RETELL_AGENT_ID = process.env.RETELL_AGENT_ID;
 const TELEGRAM_API_URL = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
 
+// DEBUG explícito para ver si la API Key llega a producción
+console.log('DEBUG ENV Retell API Key:', RETELL_API_KEY ? 'DETECTADA' : 'VACÍA');
+
 const retellClient = new Retell({
   apiKey: RETELL_API_KEY,
 });
@@ -81,6 +84,10 @@ router.post('/webhook', async (req, res) => {
     console.error('Error general en webhook:', err?.response?.data || err.message);
     res.sendStatus(500);
   }
+});
+
+module.exports = router;
+
 });
 
 module.exports = router;
